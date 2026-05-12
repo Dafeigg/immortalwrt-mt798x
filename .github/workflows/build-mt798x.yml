@@ -26,7 +26,7 @@ on:
       clean:
         description: 'Clean build (remove staging_dir/toolchain*)'
         required: false
-        default: true
+        default: false
         type: boolean
 
 jobs:
@@ -48,7 +48,7 @@ jobs:
           git clone --depth=1 https://github.com/hanwckf/immortalwrt-mt798x.git immortalwrt
           cd immortalwrt
           
-          # 创建内核 overlay 目录（用于存放额外的设备树文件）
+          # 创建内核 overlay 目录
           mkdir -p target/linux/mediatek/files-5.4/arch/arm64/boot/dts/mediatek
           
           # 复制你的 DTS 文件到 overlay 目录
@@ -66,14 +66,16 @@ jobs:
       - name: Configure firmware
         run: |
           cd immortalwrt
-          # 如果选择清理，则清空所有编译产物
+          export TERM=linux
           if [ "${{ github.event.inputs.clean }}" = "true" ]; then
             make dirclean
           fi
-          echo "CONFIG_TARGET_mediatek=y" > .config
-          echo "CONFIG_TARGET_mediatek_mt7981=y" >> .config
-          echo "CONFIG_TARGET_mediatek_mt7981_DEVICE_${{ github.event.inputs.device }}=y" >> .config
-          make defconfig
+          # 使用项目自带的默认配置模板（适合 mt7981 设备）
+          cp defconfig/mt7981-ax3000.config .config
+          # 启用你添加的设备
+          ./scripts/config --enable CONFIG_TARGET_mediatek_mt7981_DEVICE_pplink_s21
+          # 使用非交互式配置生成最终 .config
+          make olddefconfig
 
       - name: Download packages
         run: |
