@@ -26,7 +26,7 @@ on:
       clean:
         description: 'Clean build (remove staging_dir/toolchain*)'
         required: false
-        default: false
+        default: true
         type: boolean
 
 jobs:
@@ -43,31 +43,33 @@ jobs:
             gettext git libncurses-dev libssl-dev python3-distutils rsync unzip zlib1g-dev \
             file wget
 
-      - name: Clone source code and copy custom files
+      - name: Clone source code and overlay custom files
         run: |
           git clone --depth=1 https://github.com/hanwckf/immortalwrt-mt798x.git immortalwrt
           cd immortalwrt
           
-          # 1. 将你的 DTS 文件复制到内核源码目录的正确位置
-          cp ${{ github.workspace }}/target/linux/mediatek/dts/mt7981-pplink-s21.dts \
-             target/linux/mediatek/dts/
+          # 创建内核 overlay 目录（用于存放额外的设备树文件）
+          mkdir -p target/linux/mediatek/files-5.4/arch/arm64/boot/dts/mediatek
           
-          # 2. 将包含设备定义的 Makefile 复制到正确位置
+          # 复制你的 DTS 文件到 overlay 目录
+          cp ${{ github.workspace }}/target/linux/mediatek/dts/mt7981-pplink-s21.dts \
+             target/linux/mediatek/files-5.4/arch/arm64/boot/dts/mediatek/
+          
+          # 复制修改后的 mt7981.mk（包含 pplink_s21 设备定义）
           cp ${{ github.workspace }}/target/linux/mediatek/image/mt7981.mk \
              target/linux/mediatek/image/
           
-          # 3. 创建一个更完整的符号链接，确保编译系统能找到 DTS 文件（关键步骤）
-          mkdir -p target/linux/mediatek/files-5.4/arch/arm64/boot/dts/mediatek
-          ln -sf $(pwd)/target/linux/mediatek/dts/mt7981-pplink-s21.dts \
-                 target/linux/mediatek/files-5.4/arch/arm64/boot/dts/mediatek/
-          
-          # 4. 更新 feeds
+          # 更新 feeds
           ./scripts/feeds update -a
           ./scripts/feeds install -a
 
       - name: Configure firmware
         run: |
           cd immortalwrt
+          # 如果选择清理，则清空所有编译产物
+          if [ "${{ github.event.inputs.clean }}" = "true" ]; then
+            make dirclean
+          fi
           echo "CONFIG_TARGET_mediatek=y" > .config
           echo "CONFIG_TARGET_mediatek_mt7981=y" >> .config
           echo "CONFIG_TARGET_mediatek_mt7981_DEVICE_${{ github.event.inputs.device }}=y" >> .config
@@ -82,17 +84,6 @@ jobs:
       - name: Build firmware
         run: |
           cd immortalwrt
-          if [ "${{ github.event.inputs.clean }}" = "true" ]; then
-            make clean
-          fi
-          # 执行彻底清理，排除之前错误的编译产物
-          make dirclean
-          # 重新生成配置
-          echo "CONFIG_TARGET_mediatek=y" > .config
-          echo "CONFIG_TARGET_mediatek_mt7981=y" >> .config
-          echo "CONFIG_TARGET_mediatek_mt7981_DEVICE_${{ github.event.inputs.device }}=y" >> .config
-          make defconfig
-          # 开始编译
           make -j$(nproc) V=s
 
       - name: Upload artifacts
