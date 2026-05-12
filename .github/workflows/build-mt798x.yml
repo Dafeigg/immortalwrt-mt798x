@@ -24,7 +24,7 @@ on:
           - nradio_wt9103_512m
           - pplink_s21
       clean:
-        description: 'Clean build'
+        description: 'Clean build (remove all build artifacts)'
         required: false
         default: false
         type: boolean
@@ -43,45 +43,45 @@ jobs:
             gettext git libncurses-dev libssl-dev python3-distutils rsync unzip zlib1g-dev \
             file wget
 
-      - name: Clone source and overlay files
+      - name: Clone source and overlay custom files
         run: |
           git clone --depth=1 https://github.com/hanwckf/immortalwrt-mt798x.git immortalwrt
           cd immortalwrt
-          # 使用内核 overlay 方式添加自定义 DTS（最可靠）
+          # 内核 overlay 目录 (自动包含额外 DTS)
           mkdir -p target/linux/mediatek/files-5.4/arch/arm64/boot/dts/mediatek
           cp ${{ github.workspace }}/target/linux/mediatek/dts/mt7981-pplink-s21.dts \
              target/linux/mediatek/files-5.4/arch/arm64/boot/dts/mediatek/
-          # 复制设备定义文件
           cp ${{ github.workspace }}/target/linux/mediatek/image/mt7981.mk \
              target/linux/mediatek/image/
           ./scripts/feeds update -a
           ./scripts/feeds install -a
 
-      - name: Configure
+      - name: Configure firmware
         run: |
           cd immortalwrt
+          export TERM=linux
           if [ "${{ github.event.inputs.clean }}" = "true" ]; then
             make dirclean
           fi
-          # 使用项目自带的默认配置模板
+          # 关键：先复制一个完整的默认配置，确保 .config 存在
           cp defconfig/mt7981-ax3000.config .config
           # 启用你的设备
           ./scripts/config --enable CONFIG_TARGET_mediatek_mt7981_DEVICE_pplink_s21
-          # 非交互式生成最终 .config
+          # 非交互式修复依赖（此时 .config 已存在，不会调用 menuconfig）
           make olddefconfig
 
-      - name: Download
+      - name: Download packages
         run: |
           cd immortalwrt
           make download -j8
           find dl -size -1024c -exec rm -f {} \;
 
-      - name: Build
+      - name: Build firmware
         run: |
           cd immortalwrt
           make -j$(nproc) V=s
 
-      - name: Upload
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ${{ github.event.inputs.device }}-firmware
