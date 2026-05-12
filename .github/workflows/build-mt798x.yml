@@ -47,24 +47,21 @@ jobs:
         run: |
           git clone --depth=1 https://github.com/hanwckf/immortalwrt-mt798x.git immortalwrt
           cd immortalwrt
-          # 确保目标目录存在
-          mkdir -p target/linux/mediatek/dts
-          mkdir -p target/linux/mediatek/image
-          # 复制 DTS 文件（如果存在于当前仓库中）
-          if [ -f ${{ github.workspace }}/target/linux/mediatek/dts/mt7981-pplink-s21.dts ]; then
-            cp ${{ github.workspace }}/target/linux/mediatek/dts/mt7981-pplink-s21.dts target/linux/mediatek/dts/
-            echo "DTS file copied."
-          else
-            echo "DTS file not found, skipping."
-          fi
-          # 复制 mt7981.mk（如果存在于当前仓库中）
-          if [ -f ${{ github.workspace }}/target/linux/mediatek/image/mt7981.mk ]; then
-            cp ${{ github.workspace }}/target/linux/mediatek/image/mt7981.mk target/linux/mediatek/image/
-            echo "mt7981.mk copied."
-          else
-            echo "mt7981.mk not found, skipping."
-          fi
-          # 更新 feeds
+          
+          # 1. 将你的 DTS 文件复制到内核源码目录的正确位置
+          cp ${{ github.workspace }}/target/linux/mediatek/dts/mt7981-pplink-s21.dts \
+             target/linux/mediatek/dts/
+          
+          # 2. 将包含设备定义的 Makefile 复制到正确位置
+          cp ${{ github.workspace }}/target/linux/mediatek/image/mt7981.mk \
+             target/linux/mediatek/image/
+          
+          # 3. 创建一个更完整的符号链接，确保编译系统能找到 DTS 文件（关键步骤）
+          mkdir -p target/linux/mediatek/files-5.4/arch/arm64/boot/dts/mediatek
+          ln -sf $(pwd)/target/linux/mediatek/dts/mt7981-pplink-s21.dts \
+                 target/linux/mediatek/files-5.4/arch/arm64/boot/dts/mediatek/
+          
+          # 4. 更新 feeds
           ./scripts/feeds update -a
           ./scripts/feeds install -a
 
@@ -88,6 +85,14 @@ jobs:
           if [ "${{ github.event.inputs.clean }}" = "true" ]; then
             make clean
           fi
+          # 执行彻底清理，排除之前错误的编译产物
+          make dirclean
+          # 重新生成配置
+          echo "CONFIG_TARGET_mediatek=y" > .config
+          echo "CONFIG_TARGET_mediatek_mt7981=y" >> .config
+          echo "CONFIG_TARGET_mediatek_mt7981_DEVICE_${{ github.event.inputs.device }}=y" >> .config
+          make defconfig
+          # 开始编译
           make -j$(nproc) V=s
 
       - name: Upload artifacts
