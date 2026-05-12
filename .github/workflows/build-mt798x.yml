@@ -47,7 +47,7 @@ jobs:
         run: |
           git clone --depth=1 https://github.com/hanwckf/immortalwrt-mt798x.git immortalwrt
           cd immortalwrt
-          # 内核 overlay 目录 (自动包含额外 DTS)
+          # 内核 overlay 目录（自动包含额外 DTS）
           mkdir -p target/linux/mediatek/files-5.4/arch/arm64/boot/dts/mediatek
           cp ${{ github.workspace }}/target/linux/mediatek/dts/mt7981-pplink-s21.dts \
              target/linux/mediatek/files-5.4/arch/arm64/boot/dts/mediatek/
@@ -63,12 +63,9 @@ jobs:
           if [ "${{ github.event.inputs.clean }}" = "true" ]; then
             make dirclean
           fi
-          # 关键：先复制一个完整的默认配置，确保 .config 存在
           cp defconfig/mt7981-ax3000.config .config
-          # 启用你的设备
           ./scripts/config --enable CONFIG_TARGET_mediatek_mt7981_DEVICE_pplink_s21
-          # 非交互式修复依赖（此时 .config 已存在，不会调用 menuconfig）
-          make olddefconfig
+          yes "" | make oldconfig
 
       - name: Download packages
         run: |
