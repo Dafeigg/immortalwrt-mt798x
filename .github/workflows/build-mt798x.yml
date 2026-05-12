@@ -6,7 +6,7 @@ on:
       device:
         description: 'Device to build'
         required: true
-        default: 'jcg_q30'
+        default: 'pplink_s21'
         type: choice
         options:
           - jcg_q30
@@ -22,7 +22,7 @@ on:
           - cmcc_a10
           - nradio_wt9103
           - nradio_wt9103_512m
-          - pplink_s21   # 你添加的设备
+          - pplink_s21
       clean:
         description: 'Clean build (remove staging_dir/toolchain*)'
         required: false
@@ -46,19 +46,17 @@ jobs:
       - name: Clone source code
         run: |
           git clone --depth=1 https://github.com/hanwckf/immortalwrt-mt798x.git immortalwrt
-          cp -r .github immortalwrt/ 2>/dev/null || true
+          # 将当前仓库（fork）中的自定义文件复制到源码目录
+          cp -r . github_files
           cd immortalwrt
+          # 复制 DTS 文件到内核正确路径
+          mkdir -p target/linux/mediatek/dts/
+          cp ../github_files/target/linux/mediatek/dts/* target/linux/mediatek/dts/ 2>/dev/null || true
+          # 复制 mt7981.mk（确保设备定义）
+          cp ../github_files/target/linux/mediatek/image/mt7981.mk target/linux/mediatek/image/ 2>/dev/null || true
+          # 更新 feeds
           ./scripts/feeds update -a
           ./scripts/feeds install -a
-
-      - name: Copy custom files
-        run: |
-          cd immortalwrt
-          # 复制你 fork 仓库中的 dts 和 mt7981.mk 修改
-          # 由于当前仓库就是 hanwckf 的分支，实际上不需要额外复制，因为整个仓库已经包含了你的修改
-          # 但如果需要确保，可以手动覆盖
-          cp ${{ github.workspace }}/target/linux/mediatek/dts/mt7981-pplink-s21.dts target/linux/mediatek/dts/ 2>/dev/null || true
-          cp ${{ github.workspace }}/target/linux/mediatek/image/mt7981.mk target/linux/mediatek/image/ 2>/dev/null || true
 
       - name: Configure firmware
         run: |
