@@ -43,17 +43,27 @@ jobs:
             gettext git libncurses-dev libssl-dev python3-distutils rsync unzip zlib1g-dev \
             file wget
 
-      - name: Clone source code
+      - name: Clone source code and copy custom files
         run: |
           git clone --depth=1 https://github.com/hanwckf/immortalwrt-mt798x.git immortalwrt
-          # 将当前仓库（fork）中的自定义文件复制到源码目录
-          cp -r . github_files
           cd immortalwrt
-          # 复制 DTS 文件到内核正确路径
-          mkdir -p target/linux/mediatek/dts/
-          cp ../github_files/target/linux/mediatek/dts/* target/linux/mediatek/dts/ 2>/dev/null || true
-          # 复制 mt7981.mk（确保设备定义）
-          cp ../github_files/target/linux/mediatek/image/mt7981.mk target/linux/mediatek/image/ 2>/dev/null || true
+          # 确保目标目录存在
+          mkdir -p target/linux/mediatek/dts
+          mkdir -p target/linux/mediatek/image
+          # 复制 DTS 文件（如果存在于当前仓库中）
+          if [ -f ${{ github.workspace }}/target/linux/mediatek/dts/mt7981-pplink-s21.dts ]; then
+            cp ${{ github.workspace }}/target/linux/mediatek/dts/mt7981-pplink-s21.dts target/linux/mediatek/dts/
+            echo "DTS file copied."
+          else
+            echo "DTS file not found, skipping."
+          fi
+          # 复制 mt7981.mk（如果存在于当前仓库中）
+          if [ -f ${{ github.workspace }}/target/linux/mediatek/image/mt7981.mk ]; then
+            cp ${{ github.workspace }}/target/linux/mediatek/image/mt7981.mk target/linux/mediatek/image/
+            echo "mt7981.mk copied."
+          else
+            echo "mt7981.mk not found, skipping."
+          fi
           # 更新 feeds
           ./scripts/feeds update -a
           ./scripts/feeds install -a
